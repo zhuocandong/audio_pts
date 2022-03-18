@@ -3,12 +3,13 @@
  *
  *  AUTHORS:       zhuocandong    START DATE: Wednesday March 16th 2022
  *
- *  LAST MODIFIED: Thursday, March 17th 2022, 5:45:07 pm
+ *  LAST MODIFIED: Friday, March 18th 2022, 7:43:36 pm
  *
  *  CONTACT:       candong.zhuo@smartmore.com
  *******************************************************************************/
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 #define FAB(a, b) ((a > b) ? (a - b) : (b - a))
 
@@ -28,8 +29,70 @@ int ReadFrameFromFifo(struct fifo &_fifo, int out_nb)
     return 0;
 }
 
+std::vector<int> calculate_box_num(int in_size, int out_size, int max_conv)
+{
+
+    std::vector<int> box;
+
+    int in_fc = in_size / max_conv;
+    int out_fc = out_size / max_conv;
+    int fifo_size = 0;
+    int plus_num = 0;
+    int minus_num = 0;
+
+    if (in_size > out_size)
+    {
+        for (auto i = 0; i < out_fc; i++)
+        {
+            fifo_size += in_size;
+            if (fifo_size - out_size >= out_size)
+            {
+                while ((fifo_size -= out_size) >= out_size)
+                {
+                    plus_num++;
+                }
+                box.emplace_back(plus_num);
+            }
+            else
+            {
+                fifo_size -= out_size;
+                box.emplace_back(plus_num);
+            }
+            printf("box[%d] = %d\n", i, box[i]);
+        }
+    }
+    else if (in_size < out_size)
+    {
+        for (auto i = 0; i < out_fc; i++)
+        {
+            fifo_size += in_size;
+
+            if (fifo_size < out_size)
+            {
+                minus_num++;
+                box.emplace_back(-1);
+            }
+            else
+            {
+                fifo_size -= out_size;
+                box.emplace_back(minus_num);
+            }
+            printf("box[%d] = %d\n", i, box[i]);
+        }
+    }
+
+    return box;
+}
+
 int main(int argc, char **argv)
 {
+
+    if (argc < 4)
+    {
+        printf("Usage: %s [InputSize] [OutputSize] [FrameCounts]\n", argv[0]);
+        exit(1);
+    }
+
     struct fifo foo;
     int in_nb = atoi(argv[1]);
     int out_nb = atoi(argv[2]);
@@ -53,7 +116,9 @@ int main(int argc, char **argv)
     int _in_factor = in_nb / _max_conventions;
     int _out_factor = out_nb / _max_conventions;
     int plus_num_ = 0;
-    int minus_num_ = 0;
+    // int minus_num_ = 0;
+
+    std::vector<int> minus_box = calculate_box_num(in_nb, out_nb, _max_conventions);
 
     while (counts < atoi(argv[3]))
     {
@@ -76,12 +141,12 @@ int main(int argc, char **argv)
             {
                 // reset plus_num and minuns_num
                 plus_num_ = 0;
-                minus_num_ = 0;
+                // minus_num_ = 0;
             }
 
             if (audio_fifo_size(foo) < out_nb)
             {
-                minus_num_ += 1;
+                // minus_num_ += 1;
             }
 
             while (audio_fifo_size(foo) >= out_nb)
@@ -93,7 +158,7 @@ int main(int argc, char **argv)
                 if (in_nb > out_nb)
                     out_num = in_num + (in_num / _out_factor) * FAB(_in_factor, _out_factor) + plus_num_;
                 else if (in_nb < out_nb)
-                    out_num = in_num - (in_num / _out_factor) * FAB(_in_factor, _out_factor) - minus_num_;
+                    out_num = in_num - (in_num / _out_factor) * FAB(_in_factor, _out_factor) - minus_box[in_num % _out_factor];
                 else
                     out_num = in_num;
 
